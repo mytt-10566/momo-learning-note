@@ -136,13 +136,103 @@ mysql> show variables like 'innodb_old_blocks_pct';
 
 ## 2.8 刷新脏页到磁盘
 
+后台有专门的线程每隔一段时间把脏页刷新到磁盘，不影响用户正常的请求。主要有以下几种方式：
+
+- BUF_FLUSH_LRU：从LRU链表的冷数据中刷新一部分页面到磁盘
+    - 后台线程定时从LRU链表尾部开始扫描一些页，如果在LRU链表中发现脏页，则把他们刷新到磁盘
+    - 注：
+        - 扫描页面的数量通过系统变量`innodb_lru_scan_depth`设置
+        - 缓冲页是否是脏页：缓冲页对应的控制块中记录了缓冲页是否被修改
+- BUF_FLUSH_LIST：从flush链表中刷新一部分页面到磁盘
+    - 后台线程定时从flush链表中刷新一部分页面到磁盘，刷新速率取决于系统是否繁忙
+- BUF_FLUSH_SINGLE_PAGE：将单个页面刷新到磁盘
+    - 后台线程有时刷新脏页进度较慢，导致用户线程在加载一个磁盘页到Buffer Pool时没有可用的缓冲页
+    - 尝试查看LRU链表尾部是否可以直接释放到未修改的缓冲页，如果没有则将LRU链表尾部的一个脏页刷新到磁盘
+    - 注：
+        - 磁盘操作较慢，在请求时刷盘会降低用户请求速度
+        - 系统繁忙时，也有可能出现用户线程从flush链表中刷新脏页的情况
+
 ## 2.9 多个Buffer Pool实例
+
+Buffer Pool可以拆分成多个小的Buffer Pool，每个Buffer Pool称为一个实例。
+
+`innodb_buffer_pool_instances`属性可以设置Buffer Pool实例个数
+
+> 注：
+>
+> buffer pool实例 = innodb_buffer_pool_size / innodb_buffer_pool_instances
+>
+> 当innodb_buffer_pool_size小于1GB时，设置多个实例是无效的
 
 ## 2.10 innodb_buffer_pool_chunk_size
 
+MySQL不是一次性为Buffer Pool实例申请一大片连续内存空间，而是以`chunk`为单位申请空间。
+
+一个Buffer Pool实例由若干个`chunk`组成，一个`chunk`代表一片连续的内存空间，包含了若干缓冲页与其对应的控制块
+
+MySQL在运行期间可以调整Buffer Pool的大小，可以通过`chunk`为单位增加或删除内存空间
+
+`innodb_buffer_pool_chunk_size`：指定chunk大小，，默认值128M，该属性值在运行期间不可以修改。
+
+- 由于该属性不包含缓冲页对应的控制块内存空间，所以实际InnoDB申请的内存空间会比该属性值大点
+
 ## 2.11 配置Buffer Pool时的注意事项
+
+`innodb_buffer_pool_size`必须是 `innodb_buffer_pool_chunk_size` * `innodb_buffer_pool_instances`的倍数
+
+- 保证Buffer Pool实例中的chunk数量相同
+
+默认的chunk大小是128M，实例数默认是16，所以`innodb_buffer_pool_size`值必须是2GB或其整数倍，不是的话会被MySQL自动调整为整数倍
+
+```bash
+mysql> show variables like '%innodb_buffer_pool%';
++-------------------------------------+----------------+
+| Variable_name                       | Value          |
++-------------------------------------+----------------+
+| innodb_buffer_pool_chunk_size       | 134217728      |
+| innodb_buffer_pool_dump_at_shutdown | ON             |
+| innodb_buffer_pool_dump_now         | OFF            |
+| innodb_buffer_pool_dump_pct         | 25             |
+| innodb_buffer_pool_filename         | ib_buffer_pool |
+| innodb_buffer_pool_instances        | 1              |
+| innodb_buffer_pool_load_abort       | OFF            |
+| innodb_buffer_pool_load_at_startup  | ON             |
+| innodb_buffer_pool_load_now         | OFF            |
+| innodb_buffer_pool_size             | 536870912      |
++-------------------------------------+----------------+
+```
 
 ## 2.12 查看Buffer Pool的状态信息
 
+查看Buffer Pool状态：`show engine innodb status;`
 
- 
+```bash
+mysql> show engine innodb status\G;
+
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 549715968
+Dictionary memory allocated 441202
+Buffer pool size   32764
+Free buffers       31447
+Database pages     1301
+Old database pages 460
+Modified db pages  0
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 508, not young 0
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 511, created 849, written 20160
+0.00 reads/s, 0.00 creates/s, 0.00 writes/s
+No buffer pool page gets since the last printout
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 1301, unzip_LRU len: 0
+I/O sum[0]:cur[0], unzip sum[0]:cur[0]
+```
+
+参数说明：
+
+- Total large memory allocated：表示Buffer Pool申请的连续内存空间大小，包括全部控制块、缓冲页、碎片大小
+- Dictionary memory allocated：数据字典信息分配的内存空间大小，不包含在Total large memory allocated
+- Buffer pool size：表示Buffer Pool可以容纳多少缓冲页，单位：页
+- TODO
