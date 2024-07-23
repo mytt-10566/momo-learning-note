@@ -37,7 +37,20 @@
 
 ## 三、安装Kibana
 
-TODO
+### 3.1 mac安装
+
+-
+官网下载es：[https://www.elastic.co/cn/downloads/past-releases#kibana](https://www.elastic.co/cn/downloads/past-releases#kibana)
+  - 下载 elasticsearch-8.12.2版本
+- 解压安装
+  - 解压放至 /usr/local/elasticsearch/kibana 目录下
+- 修改配置文件
+  - cd /usr/local/elasticsearch/kibana/kibana-8.12.2/config
+    - 修改 kibana.yml
+- 启动ES
+  - cd /usr/local/elasticsearch/kibana/kibana-8.12.2/bin
+  - ./kibana
+- 访问ES：[http://localhost:5601](http://localhost:5601)
 
 ## 四、安装插件
 
@@ -61,7 +74,6 @@ TODO
 - 配置扩展词条文件
 
 ```xml
-
 <entry key="ext_dict">ext.dic</entry>
 ```
 
@@ -73,7 +85,6 @@ TODO
 - 配置扩展词条文件
 
 ```xml
-
 <entry key="ext_stopwords">stopwords.dic</entry>
 ```
 
