@@ -204,14 +204,5 @@ type类型说明：
 > api：
 > - 删除文档：DELETE http://localhost:9200/{index_name}/_doc/{id}
 
-## 1.4 复杂查询
+## 1.4 批处理
 
-### 1.4.1 查询文档
-
-> api：
-> - 查询指定文档：GET http://localhost:9200/{index_name}/_doc/{id}
-> - 查询所有文档：GET http://localhost:9200/{index_name}/_search
-
-示例：
-
-- 查询博客：`GET http://localhost:9200/blog/_doc/1`
